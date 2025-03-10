@@ -6,6 +6,7 @@ import sys
 from ChironAST.builder import astGenPass
 import abstractInterpretation as AI
 import dataFlowAnalysis as DFA
+import SSA_transformation as SSA
 from sbfl import testsuiteGenerator
 
 sys.path.insert(0, "../Submission/")
@@ -134,6 +135,14 @@ if __name__ == "__main__":
         help="Run data flow analysis using worklist algorithm on a Chiron Program.",
     )
 
+    #added by Sarthak Motwani
+    cmdparser.add_argument(
+        "-ssa",
+        "--ssa_transformation",
+        action="store_true",
+        help="Run SSA Transformation",
+    )
+    # adding ends here
     cmdparser.add_argument(
         "-sbfl",
         "--SBFL",
@@ -219,7 +228,7 @@ if __name__ == "__main__":
 
     # generate control_flow_graph from IR statements.
     if args.control_flow:
-        cfg = cfgB.buildCFG(ir, "control_flow_graph", True)
+        cfg = cfgB.buildCFG(ir, "control_flow_graph")
         irHandler.setCFG(cfg)
     else:
         irHandler.setCFG(None)
@@ -227,6 +236,14 @@ if __name__ == "__main__":
     if args.dump_cfg:
         cfgB.dumpCFG(cfg, "control_flow_graph")
         # set the cfg of the program.
+
+    #Added by Sarthak Motwani
+    if args.ssa_transformation:
+        cfg = cfgB.buildCFG(ir, "control_flow_graph")
+        irHandler.setCFG(cfg)
+        ssa_cfg = SSA.build_ssa(ir, cfg)
+    
+    #Adding ends
 
     if args.ir:
         irHandler.pretty_print(irHandler.ir)

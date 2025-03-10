@@ -91,7 +91,7 @@ class IRHandler:
             if isinstance(stmtList[index][0], ChironAST.ConditionCommand):
                 # Update the target of this conditional statement and the
                 # target statment's target number accordingly.
-                updateJump(stmtList, index, pos)
+                self.updateJump(stmtList, index, pos)
             index += 1
         # We only allow non-jump statement addition as of now.
         stmtList.insert(pos, (inst, 1))
