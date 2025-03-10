@@ -13,7 +13,7 @@ from ChironAST.ChironAST import (
     Num, BoolTrue, BoolFalse
 )
 from irhandler import IRHandler
-from cfg.cfgBuilder import dumpCFG
+from cfg.cfgBuilder import dumpCFG, buildCFG
 from cfg.ChironCFG import BasicBlock, ChironCFG
 
 # ========================= Helper Functions ========================
@@ -183,6 +183,7 @@ class SSATransformer:
 
     def insert_phi_functions(self):
         """Insert φ-functions at dominance frontiers"""
+        idx_phi=[]
         for var in self.globals:
             worklist = [bb for bb in self.cfg.nodes() if any(
                 isinstance(instr, AssignmentCommand) and instr.lvar.varname == var
@@ -198,11 +199,26 @@ class SSATransformer:
                         phi = PhiCommand(var, [""] * num_preds)  # Initialize with placeholders
                         idx_in_ir = df_node.instrlist[0][1]
                         df_node.instrlist.insert(0, (phi, idx_in_ir))
-                        ir_handler = IRHandler()
-                        ir_handler.addInstruction(self.ir, phi, idx_in_ir)
+                        idx_phi.append((idx_in_ir, phi))
+                        # print(idx_in_ir)
+                        # ir_handler = IRHandler()
+                        # ir_handler.addInstruction(self.ir, phi, idx_in_ir)
                         if df_node not in worklist:
                             worklist.append(df_node)
-        
+
+        # Adding phi-instructions to the actual IR
+        # print(idx_phi)
+        ir_handler = IRHandler()
+        idx_phi.sort(key=lambda x: x[0])
+        # print(len(idx_phi))
+        # for i_p in idx_phi:
+        #     print(i_p[0])
+        real_ctr = 0
+        for i_p in idx_phi:
+            real_idx = i_p[0]+real_ctr
+            ir_handler.addInstruction(self.ir, i_p[1], real_idx)
+            real_ctr+=1
+
         dumpCFG(self.cfg, "cfg_after_phi_insertion")
         return self.cfg
 
@@ -347,4 +363,6 @@ def build_ssa(ir, cfg: ChironCFG) -> ChironCFG:
     transformer = SSATransformer(ir, cfg)
     transformer.insert_phi_functions()
     transformer.rename_variables()
+    # post_ssa_CFG = buildCFG(ir, "post_ssa_control_flow_graph")
+    # dumpCFG(post_ssa_CFG, "cfg_post_ssa")
     return transformer.cfg
