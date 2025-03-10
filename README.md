@@ -60,10 +60,11 @@ $ java -cp ../extlib/antlr-4.7.2-complete.jar org.antlr.v4.Tool \
 
 The main directory for source files is `ChironCore`. We have examples of the turtle programs in `examples` folder.
 To pass parameters (input params) for running a turtle program, use the `-d` flag. Pass the parameters as a python dictionary. 
+To convert the IR to SSA form, use the `-ssa` flag. To compare IRs before and after SSA, first run the program without this flag and then re-run the program with this flag. The IR is printed in the terminal (using the `-ir` flag) and CFG after phi-function insertion can be seen in `cfg_after_phi_insertion.png` and after renaming can be seen in `cfg_after_rename.png`.
 
 ```bash
 $ cd ChironCore
-$ ./chiron.py -r ./example/example1.tl -d '{":x": 20, "y": 30, ":z": 20, ":p": 40}'
+$ ./chiron.py -r ./example/example6.tl -cfg_gen -cfg_dump --ir -ssa
 ```
 
 ### See help for other command line options
