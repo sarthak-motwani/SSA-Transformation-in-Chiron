@@ -17,13 +17,14 @@ from networkx.drawing.nx_agraph import to_agraph
 # matplotlib.use('TkAgg')
 
 
-def buildCFG(ir, cfgName="", isSingle=False):
+def buildCFG_ssa(ir, cfgName="", isSingle=False):
 
     startBB = BasicBlock('START')
     endBB = BasicBlock('END')
     leaderIndices = {0, len(ir)}
     leader2IndicesMap = {startBB : 0, endBB : len(ir)}
     indices2LeadersMap = {0: startBB, len(ir): endBB}
+    bb2PhiListMap = {}
 
     # finding leaders in the IR
     for idx, item in enumerate(ir):
@@ -49,14 +50,23 @@ def buildCFG(ir, cfgName="", isSingle=False):
     for leader in leader2IndicesMap.keys():
         cfg.add_node(leader)
 
-     # partitioning the ir list
+    # partitioning the ir list
     # and adding statements to corresponding BasicBlock node
+    phi_buffer=[]
     for currLeader in leader2IndicesMap.keys():
         leaderIdx = leader2IndicesMap[currLeader]
         currIdx = leaderIdx
+        if(len(phi_buffer)!=0):
+            bb2PhiListMap[currLeader] = phi_buffer
+            phi_buffer=[]
         while (currIdx < len(ir)):
             currLeader.append((ir[currIdx][0], currIdx))
             currIdx += 1
+            if(currIdx < len(ir) and isinstance(ir[currIdx][0], ChironAST.PhiCommand)):
+                # print("inside")
+                while(currIdx < len(ir) and currIdx not in leaderIndices):
+                    phi_buffer.append((ir[currIdx][0], currIdx))
+                    currIdx+=1
             if currIdx in leaderIndices: break
 
     # adding edges
@@ -80,11 +90,15 @@ def buildCFG(ir, cfgName="", isSingle=False):
                 nextBB = indices2LeadersMap[irIdx + 1] if (irIdx + 1 < len(ir)) else endBB
                 cfg.add_edge(node, nextBB, label='flow_edge', color='blue')
 
+    
+    for currLeader in bb2PhiListMap.keys():
+        phi_buffer =  bb2PhiListMap[currLeader]
+        for instr_idx in phi_buffer:
+             currLeader.instrlist.insert(0, instr_idx)
+    
     return cfg
 
-
-
-def dumpCFG(cfg, filename="out"):
+def dumpCFG_ssa(cfg, filename="out"):
     G = cfg.nxgraph
 
     # generating custom labels for graph nodes

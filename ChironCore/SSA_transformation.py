@@ -15,6 +15,7 @@ from ChironAST.ChironAST import (
 from irhandler import IRHandler
 from cfg.cfgBuilder import dumpCFG, buildCFG
 from cfg.ChironCFG import BasicBlock, ChironCFG
+import bisect
 
 # ========================= Helper Functions ========================
 def get_used_vars(expr) -> Set[str]:
@@ -181,9 +182,68 @@ class SSATransformer:
         """Identify variables live across multiple blocks"""
         return set().union(*self.ue_var.values())
 
+    
+    def insert_phi_in_ir(self, idx_phi):
+        """ Add phi-instructions in the actual IR"""
+        ir_handler = IRHandler()
+        idx_phi.sort(key=lambda x: x[0])
+        real_ctr = 0
+        for i_p in idx_phi:
+            # print(i_p[0])
+            real_idx = i_p[0]+real_ctr
+            # print("pos added", real_idx)
+            ir_handler.addInstruction(self.ir, i_p[1], real_idx)
+            real_ctr+=1
+
+    def synchronize_cfg_ir(self, idx_phi):
+        """ Make instruction indices in IR and the (old) CFG same"""
+        # synchronizing all except phi-instructions
+        idx_list = [idx for idx, _ in idx_phi]
+        for bb in self.cfg.nodes():
+            for i, (instr, idx) in enumerate(bb.instrlist):
+                if(isinstance(instr, PhiCommand)):
+                    continue
+                count = bisect.bisect_right(idx_list, idx)
+                # print(idx, count)
+                bb.instrlist[i] = (bb.instrlist[i][0], idx + count)
+        
+        #synchronizing the phi-instructions
+        for bb in self.cfg.nodes():
+            num_phi = 0 #number of phi_instructions in the bb
+            for i, (instr, idx) in enumerate(bb.instrlist):
+                if(isinstance(instr, PhiCommand)):
+                    num_phi+=1
+                else:
+                    for j in range(num_phi):
+                        bb.instrlist[j] = (bb.instrlist[j][0], idx-num_phi+j)
+                    break
+                
+                if(num_phi==0):
+                    break
+
+    def Update_Jump_Offsets(self):
+        """Update Jump Offsets in IR after inserting instructions"""
+        for bb in self.cfg.nodes():
+            if(len(bb.instrlist)==0):
+                continue
+            first_instr_bb = bb.instrlist[0][0]
+            first_instr_idx_bb = bb.instrlist[0][1]
+            for pred_block in self.cfg.predecessors(bb):
+                # last_instr_pred = pred_block.instrlist[-1][0]
+                last_instr_idx_pred = pred_block.instrlist[-1][1]
+                if self.cfg.get_edge_label(pred_block, bb) == 'Cond_False':
+                    if(last_instr_idx_pred+self.ir[last_instr_idx_pred][1]!=first_instr_idx_bb):
+                        # print("--ye galat hai")
+                        # print("Predecessor last Instruction", last_instr_idx_pred)
+                        # print("Instruction pointed to", last_instr_idx_pred+self.ir[last_instr_idx_pred][1])
+                        # print("Should point to", first_instr_idx_bb)
+                        self.ir[last_instr_idx_pred] = (self.ir[last_instr_idx_pred][0], first_instr_idx_bb - last_instr_idx_pred)
+
+    
     def insert_phi_functions(self):
         """Insert φ-functions at dominance frontiers"""
         idx_phi=[]
+
         for var in self.globals:
             worklist = [bb for bb in self.cfg.nodes() if any(
                 isinstance(instr, AssignmentCommand) and instr.lvar.varname == var
@@ -197,27 +257,20 @@ class SSATransformer:
                         # Get number of predecessors to size operands
                         num_preds = len(list(self.cfg.predecessors(df_node)))
                         phi = PhiCommand(var, [""] * num_preds)  # Initialize with placeholders
-                        idx_in_ir = df_node.instrlist[0][1]
+                        idx_in_ir = df_node.instrlist[0][1]    
                         df_node.instrlist.insert(0, (phi, idx_in_ir))
                         idx_phi.append((idx_in_ir, phi))
-                        # print(idx_in_ir)
-                        # ir_handler = IRHandler()
-                        # ir_handler.addInstruction(self.ir, phi, idx_in_ir)
                         if df_node not in worklist:
                             worklist.append(df_node)
 
         # Adding phi-instructions to the actual IR
-        # print(idx_phi)
-        ir_handler = IRHandler()
-        idx_phi.sort(key=lambda x: x[0])
-        # print(len(idx_phi))
-        # for i_p in idx_phi:
-        #     print(i_p[0])
-        real_ctr = 0
-        for i_p in idx_phi:
-            real_idx = i_p[0]+real_ctr
-            ir_handler.addInstruction(self.ir, i_p[1], real_idx)
-            real_ctr+=1
+        self.insert_phi_in_ir(idx_phi)
+
+        #syncronizing instruction indices in CFG and IR
+        self.synchronize_cfg_ir(idx_phi)
+        
+        #updating jump offsets in original IR
+        self.Update_Jump_Offsets()
 
         dumpCFG(self.cfg, "cfg_after_phi_insertion")
         return self.cfg
@@ -363,6 +416,6 @@ def build_ssa(ir, cfg: ChironCFG) -> ChironCFG:
     transformer = SSATransformer(ir, cfg)
     transformer.insert_phi_functions()
     transformer.rename_variables()
-    # post_ssa_CFG = buildCFG(ir, "post_ssa_control_flow_graph")
-    # dumpCFG(post_ssa_CFG, "cfg_post_ssa")
+    post_ssa_CFG = buildCFG(ir, "post_ssa_control_flow_graph")
+    dumpCFG(post_ssa_CFG, "cfg_new_post_ssa")
     return transformer.cfg

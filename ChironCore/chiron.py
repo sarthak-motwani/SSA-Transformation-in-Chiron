@@ -7,6 +7,7 @@ from ChironAST.builder import astGenPass
 import abstractInterpretation as AI
 import dataFlowAnalysis as DFA
 import SSA_transformation as SSA
+import Out_of_ssa as OutSSA
 from sbfl import testsuiteGenerator
 
 sys.path.insert(0, "../Submission/")
@@ -142,6 +143,14 @@ if __name__ == "__main__":
         action="store_true",
         help="Run SSA Transformation",
     )
+
+    cmdparser.add_argument(
+        "-outssa",
+        "--out_of_ssa",
+        action="store_true",
+        help="Run Out of SSA Transformation",
+    )
+
     # adding ends here
     cmdparser.add_argument(
         "-sbfl",
@@ -243,6 +252,9 @@ if __name__ == "__main__":
         irHandler.setCFG(cfg)
         ssa_cfg = SSA.build_ssa(ir, cfg)
     
+        if args.out_of_ssa:
+            OutSSA.out_of_ssa(ir, cfg)
+
     #Adding ends
 
     if args.ir:
