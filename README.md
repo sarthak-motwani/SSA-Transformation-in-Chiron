@@ -61,8 +61,10 @@ $ java -cp ../extlib/antlr-4.7.2-complete.jar org.antlr.v4.Tool \
 The main directory for source files is `ChironCore`. We have examples of the turtle programs in `examples` folder.
 To pass parameters (input params) for running a turtle program, use the `-d` flag. Pass the parameters as a python dictionary. 
 To convert the IR to SSA form, use the `-ssa` flag. To compare IRs before and after SSA, first run the program without this flag and then re-run the program with this flag. The IR is printed in the terminal (using the `-ir` flag) and CFG after phi-function insertion can be seen in `cfg_after_phi_insertion.png` and after renaming can be seen in `cfg_after_rename.png`.
-\\ Now, I have also modified the jump offsets in the linear IR, since they became incorrect after inserting  instructions in the linear IR. After modifying these offsets, I am making a new CFG from this IR which can be seen at `cfg_new_post_ssa.png`.
-\\ So, While testing there are two things to test for now. One is that the SSA transformation is correct (this 
+
+- Now, I have also modified the jump offsets in the linear IR, since they became incorrect after inserting  instructions in the linear IR. After modifying these offsets, I am making a new CFG from this IR which can be seen at `cfg_new_post_ssa.png`.
+
+- So, While testing there are two things to test for now. One is that the SSA transformation is correct (this 
 can be checked by seeing whether phi-function insertion and renaming is happening correctly in `cfg_after_rename.png`). Also, to check that the jump offsets in the IR are correctly modified (can be done by checking that
 `cfg_after_rename.png` and `cfg_new_post_ssa.png` are identical).
 
