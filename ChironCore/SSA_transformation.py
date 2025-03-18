@@ -185,14 +185,15 @@ class SSATransformer:
     
     def insert_phi_in_ir(self, idx_phi):
         """ Add phi-instructions in the actual IR"""
-        ir_handler = IRHandler()
+        # ir_handler = IRHandler()
         idx_phi.sort(key=lambda x: x[0])
         real_ctr = 0
         for i_p in idx_phi:
             # print(i_p[0])
             real_idx = i_p[0]+real_ctr
             # print("pos added", real_idx)
-            ir_handler.addInstruction(self.ir, i_p[1], real_idx)
+            self.ir.insert(real_idx, (i_p[1], 1))
+            # ir_handler.addInstruction(self.ir, i_p[1], real_idx)
             real_ctr+=1
 
     def synchronize_cfg_ir(self, idx_phi):

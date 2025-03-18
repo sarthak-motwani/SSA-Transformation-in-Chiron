@@ -6,6 +6,9 @@
 if (:a > :b) [
   if (:c < :d) [
     :x = :c * :d
+    :c = :d
+    :d = :c
+    :c = :d
   ]
 ] else [
   :x = :a - :b
