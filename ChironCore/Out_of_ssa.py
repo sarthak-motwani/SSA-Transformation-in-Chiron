@@ -6,7 +6,7 @@ Out-of-SSA Transformation for ChironLang
 
 from typing import List, Tuple, Dict, Set
 from ChironAST.ChironAST import (
-    Instruction, PhiCommand, AssignmentCommand, ConditionCommand, BoolExpr, BoolFalse, Var
+    Instruction, PhiCommand, AssignmentCommand, ConditionCommand, BoolExpr, BoolFalse, Var, Num
 )
 from irhandler import IRHandler
 from cfg.cfgBuilder import buildCFG, dumpCFG
@@ -90,6 +90,12 @@ class OutOfSSATransformer:
                 
                 for idx, pred in enumerate(predecessors):
                     operand = operands[idx]
+                    if(operand.endswith("_0")):
+                        temp_assignment = AssignmentCommand(Var(operand), Num(-1))
+                        if(isinstance(pred.instrlist[-1][0], ConditionCommand)):
+                            pred.instrlist.insert(len(pred.instrlist) - 1, (temp_assignment, insert_pos))
+                        else:
+                            pred.instrlist.append((temp_assignment, insert_pos))
                     # Create assignment: var = operand
                     assignment = AssignmentCommand(Var(var), Var(operand))
                     insert_pos = bb.instrlist[0][1]

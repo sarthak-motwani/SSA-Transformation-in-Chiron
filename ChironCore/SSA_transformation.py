@@ -411,6 +411,8 @@ class SSATransformer:
         process_block(entry_node)
         dumpCFG(self.cfg, "cfg_after_rename")
         return self.cfg
+
+
 # ======================== Interface ========================
 def build_ssa(ir, cfg: ChironCFG) -> ChironCFG:
     """Top-level SSA transformation entry point"""
