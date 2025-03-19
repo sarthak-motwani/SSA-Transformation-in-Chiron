@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-"""
-Complete SSA Transformation Implementation for ChironLang 
-"""
+""" SSA Transformation Implementation for ChironLang """
 
 from typing import Dict, Set, List, Tuple
 import networkx as nx
@@ -17,9 +15,8 @@ from cfg.cfgBuilder import dumpCFG, buildCFG
 from cfg.ChironCFG import BasicBlock, ChironCFG
 import bisect
 
-# ========================= Helper Functions ========================
+# Function to recursively extract used variables in an expression
 def get_used_vars(expr) -> Set[str]:
-    """Recursively extract all variables from an expression"""
     if isinstance(expr, Var):
         return {expr.varname}
     elif isinstance(expr, (BinArithOp, BinCondOp)):
@@ -30,9 +27,8 @@ def get_used_vars(expr) -> Set[str]:
         return set()
     return set()
 
-# ======================= Dominance Analysis ========================
+# Function to compute dominators set for every basic block
 def compute_dominators(cfg: ChironCFG) -> Dict[BasicBlock, Set[BasicBlock]]:
-    """Compute dominance relationships"""
     dominators = {}
     entry = cfg.entry
     all_nodes = set(cfg.nodes())
@@ -46,9 +42,7 @@ def compute_dominators(cfg: ChironCFG) -> Dict[BasicBlock, Set[BasicBlock]]:
         changed = False
         for node in cfg.nodes():
             if node == entry:
-                continue
-                
-            # Get predecessors and handle empty case
+                continue   
             preds = list(cfg.predecessors(node))
             if preds:
                 # Compute intersection of all predecessors' dominators
@@ -56,7 +50,7 @@ def compute_dominators(cfg: ChironCFG) -> Dict[BasicBlock, Set[BasicBlock]]:
                 new_dom = set.intersection(*predecessor_doms)
             else:
                 new_dom = set()
-                
+
             new_dom.add(node)  # Node always dominates itself
             
             if new_dom != dominators[node]:
@@ -65,14 +59,14 @@ def compute_dominators(cfg: ChironCFG) -> Dict[BasicBlock, Set[BasicBlock]]:
                 
     return dominators
 
+# Function to computer dominator tree using the CFG and immediate dominator
 def compute_dominator_tree(dominators: Dict) -> Dict[BasicBlock, List[BasicBlock]]:
-    """Build immediate dominator tree by checking dominance relationships."""
     dom_tree = {n: [] for n in dominators}
 
     for node in dominators:
         candidates = dominators[node] - {node}
         if not candidates:
-            continue  # Skip entry node
+            continue
 
         # Find the immediate dominator (IDOM)
         idom = None
@@ -91,35 +85,32 @@ def compute_dominator_tree(dominators: Dict) -> Dict[BasicBlock, List[BasicBlock
 
     return dom_tree
 
-def compute_dominance_frontiers(
-    cfg: ChironCFG,
-    dominators: Dict[BasicBlock, Set[BasicBlock]]
-) -> Dict[BasicBlock, Set[BasicBlock]]:
-    """Compute dominance frontiers using Cytron's algorithm (fixed IDOM handling)"""
+
+# Function to compute dominance frontiers
+def compute_dominance_frontiers( cfg: ChironCFG, dominators: Dict[BasicBlock, Set[BasicBlock]]) -> Dict[BasicBlock, Set[BasicBlock]]:
+    
     frontiers = {n: set() for n in cfg.nodes()}
     dom_tree = compute_dominator_tree(dominators)
 
     for node in cfg.nodes():
         predecessors = list(cfg.predecessors(node))
-        if len(predecessors) >= 2:  # Merge point (e.g., Block 10)
+        if len(predecessors) >= 2:  # Merge point
             for p in predecessors:
                 runner = p
                 idom = next((d for d, children in dom_tree.items() if node in children), None)
                 while runner != idom and runner is not None:
                     frontiers[runner].add(node)
-                    # Move to runner's immediate dominator
-                    runner = next((d for d, children in dom_tree.items() if runner in children), None)
+                    runner = next((d for d, children in dom_tree.items() if runner in children), None) # Move to runner's immediate dominator
     return frontiers
 
-# ===================== Live Variable Analysis ======================
+# Live Variable Analysis
 def compute_live_vars(cfg: ChironCFG) -> Tuple[Dict, Dict, Dict, Dict]:
-    """Compute live variables using dataflow analysis"""
     live_in = {bb: set() for bb in cfg.nodes()}
     live_out = {bb: set() for bb in cfg.nodes()}
     ue_var = {bb: set() for bb in cfg.nodes()}
     var_kill = {bb: set() for bb in cfg.nodes()}
 
-    # First pass: Compute UEVar and VarKill
+    # Compute UEVar and VarKill
     for bb in cfg.nodes():
         for instr, _ in bb.instrlist:
             used = set()
@@ -136,7 +127,6 @@ def compute_live_vars(cfg: ChironCFG) -> Tuple[Dict, Dict, Dict, Dict]:
             elif isinstance(instr, ConditionCommand):
                 used.update(get_used_vars(instr.cond))
 
-            # Update analysis sets
             for var in used:
                 if var not in var_kill[bb]:
                     ue_var[bb].add(var)
@@ -157,10 +147,8 @@ def compute_live_vars(cfg: ChironCFG) -> Tuple[Dict, Dict, Dict, Dict]:
 
     return ue_var, var_kill, live_in, live_out
 
-# ======================== SSA Transformer ==========================
+# Class for SSA Transformation
 class SSATransformer:
-    """Main SSA transformation engine"""
-    
     def __init__(self, ir, cfg: ChironCFG):
         self.cfg = cfg
         self.ir = ir
@@ -169,35 +157,24 @@ class SSATransformer:
         self.df = compute_dominance_frontiers(cfg, self.dominators)
         self.ue_var, self.var_kill, self.live_in, self.live_out = compute_live_vars(cfg)
         self.globals = self._compute_globals()
-        self._validate_cfg()
 
-    def _validate_cfg(self):
-        """Ensure CFG is properly structured"""
-        if not isinstance(self.cfg, ChironCFG):
-            raise ValueError("Invalid CFG type")
-        if not self.cfg.entry:
-            raise ValueError("CFG missing entry node")
-
+    # Function to compute global variables (variables whose liveness span multiple blocks)
     def _compute_globals(self) -> Set[str]:
-        """Identify variables live across multiple blocks"""
         return set().union(*self.ue_var.values())
 
-    
+    # Function to insert phi-functions in the IR using positions known from CFG
     def insert_phi_in_ir(self, idx_phi):
-        """ Add phi-instructions in the actual IR"""
-        # ir_handler = IRHandler()
         idx_phi.sort(key=lambda x: x[0])
         real_ctr = 0
         for i_p in idx_phi:
-            # print(i_p[0])
             real_idx = i_p[0]+real_ctr
-            # print("pos added", real_idx)
             self.ir.insert(real_idx, (i_p[1], 1))
-            # ir_handler.addInstruction(self.ir, i_p[1], real_idx)
             real_ctr+=1
 
+    
+    # Helper function to make instruction indices in IR and (old) CFG same 
+    # (used in updating jump offsets in IR)
     def synchronize_cfg_ir(self, idx_phi):
-        """ Make instruction indices in IR and the (old) CFG same"""
         # synchronizing all except phi-instructions
         idx_list = [idx for idx, _ in idx_phi]
         for bb in self.cfg.nodes():
@@ -205,12 +182,11 @@ class SSATransformer:
                 if(isinstance(instr, PhiCommand)):
                     continue
                 count = bisect.bisect_right(idx_list, idx)
-                # print(idx, count)
                 bb.instrlist[i] = (bb.instrlist[i][0], idx + count)
         
-        #synchronizing the phi-instructions
+        # synchronizing the phi-instructions
         for bb in self.cfg.nodes():
-            num_phi = 0 #number of phi_instructions in the bb
+            num_phi = 0 # number of phi_instructions in the bb
             for i, (instr, idx) in enumerate(bb.instrlist):
                 if(isinstance(instr, PhiCommand)):
                     num_phi+=1
@@ -218,33 +194,31 @@ class SSATransformer:
                     for j in range(num_phi):
                         bb.instrlist[j] = (bb.instrlist[j][0], idx-num_phi+j)
                     break
-                
+    
                 if(num_phi==0):
                     break
 
+    # Update Jump Offsets in IR after inserting instructions
     def Update_Jump_Offsets(self):
-        """Update Jump Offsets in IR after inserting instructions"""
         for bb in self.cfg.nodes():
-            if(len(bb.instrlist)==0):
+            if(len(bb.instrlist)==0 and bb.name!='END'):
                 continue
-            first_instr_bb = bb.instrlist[0][0]
-            first_instr_idx_bb = bb.instrlist[0][1]
-            for pred_block in self.cfg.predecessors(bb):
-                # last_instr_pred = pred_block.instrlist[-1][0]
-                last_instr_idx_pred = pred_block.instrlist[-1][1]
-                if self.cfg.get_edge_label(pred_block, bb) == 'Cond_False':
-                    if(last_instr_idx_pred+self.ir[last_instr_idx_pred][1]!=first_instr_idx_bb):
-                        # print("--ye galat hai")
-                        # print("Predecessor last Instruction", last_instr_idx_pred)
-                        # print("Instruction pointed to", last_instr_idx_pred+self.ir[last_instr_idx_pred][1])
-                        # print("Should point to", first_instr_idx_bb)
-                        self.ir[last_instr_idx_pred] = (self.ir[last_instr_idx_pred][0], first_instr_idx_bb - last_instr_idx_pred)
+            if(bb.name=='END' and len(bb.instrlist)==0):
+                for pred_block in self.cfg.predecessors(bb):
+                    last_instr_idx_pred = pred_block.instrlist[-1][1]
+                    self.ir[last_instr_idx_pred] = (self.ir[last_instr_idx_pred][0], len(self.ir) - last_instr_idx_pred)
+            else: 
+                first_instr_idx_bb = bb.instrlist[0][1]
+                for pred_block in self.cfg.predecessors(bb):
+                    last_instr_idx_pred = pred_block.instrlist[-1][1]
+                    if self.cfg.get_edge_label(pred_block, bb) == 'Cond_False':
+                        if(last_instr_idx_pred+self.ir[last_instr_idx_pred][1]!=first_instr_idx_bb):
+                            self.ir[last_instr_idx_pred] = (self.ir[last_instr_idx_pred][0], first_instr_idx_bb - last_instr_idx_pred)
 
     
+    # Function to insert phi-functions for global variables at dom. frontiers
     def insert_phi_functions(self):
-        """Insert φ-functions at dominance frontiers"""
-        idx_phi=[]
-
+        idx_phi=[] # List to keep track of positions to insert in IR
         for var in self.globals:
             worklist = [bb for bb in self.cfg.nodes() if any(
                 isinstance(instr, AssignmentCommand) and instr.lvar.varname == var
@@ -255,10 +229,10 @@ class SSATransformer:
                 bb = worklist.pop(0)
                 for df_node in self.df[bb]:
                     if not self._has_phi_for_var(df_node, var):
-                        # Get number of predecessors to size operands
                         num_preds = len(list(self.cfg.predecessors(df_node)))
-                        phi = PhiCommand(var, [""] * num_preds)  # Initialize with placeholders
-                        idx_in_ir = df_node.instrlist[0][1]    
+                        phi = PhiCommand(var, [""] * num_preds)
+                        if(len(df_node.instrlist)!=0): idx_in_ir = df_node.instrlist[0][1] 
+                        else: idx_in_ir = len(self.ir)
                         df_node.instrlist.insert(0, (phi, idx_in_ir))
                         idx_phi.append((idx_in_ir, phi))
                         if df_node not in worklist:
@@ -273,11 +247,10 @@ class SSATransformer:
         #updating jump offsets in original IR
         self.Update_Jump_Offsets()
 
-        dumpCFG(self.cfg, "cfg_after_phi_insertion")
+        dumpCFG(self.cfg, "cfg1_old_after_phi_insertion")
         return self.cfg
 
     def print_ir_before_rename(self, title: str = ""):
-        """Print the current IR state for debugging"""
         print(f"\n========== {title} ==========")
         for bb in self.cfg.nodes():
             print(f"\n--- Block {bb.name} ---")
@@ -288,16 +261,15 @@ class SSATransformer:
         for bb in self.cfg.nodes():
             print(f"Dom_tree({bb.name}) = {[df_node.name for df_node in self.dom_tree[bb]]}")
 
-       
+    # Function to check if a basic block already has phi-function for a variable  
     def _has_phi_for_var(self, bb: BasicBlock, var: str) -> bool:
-        """Check if block already has φ-function for variable"""
         return any(
             isinstance(instr, PhiCommand) and instr.var == var
             for instr, _ in bb.instrlist
         )
 
+    # Function to recursively rename variables in artith. or bool expressions
     def _rename_in_expr(self, expr, stacks: Dict[str, List[str]]):
-        """Recursively rename variables in expressions (supports both arithmetic and boolean)"""
         if isinstance(expr, Var):
             if expr.varname in stacks and stacks[expr.varname]:
                 expr.varname = stacks[expr.varname][-1]
@@ -307,10 +279,8 @@ class SSATransformer:
         elif isinstance(expr, (UnaryArithOp, NOT)):
             self._rename_in_expr(expr.expr, stacks)
 
-
+    # Function to perform variable renaming for all instructions
     def rename_variables(self) -> ChironCFG:
-        """Perform systematic variable renaming for all variables"""
-        # Phase 1: Collect ALL variables in the program
         all_vars = set()
         ssa_to_base = {}  # Tracks SSA names to original bases
 
@@ -333,11 +303,11 @@ class SSATransformer:
                     elif isinstance(instr, ConditionCommand):
                         used = get_used_vars(instr.cond)
                     all_vars.update(used)
-                # Handle Phi operands
+                
                 if isinstance(instr, PhiCommand):
                     all_vars.update(op for op in instr.operands if op)
 
-        # Phase 2: Initialize renaming infrastructure
+        # Pass 2: Initialize renaming 
         counters = {var: 0 for var in all_vars}
         stacks = {var: [] for var in all_vars}
         
@@ -347,8 +317,8 @@ class SSATransformer:
             ssa_to_base[var]=var
             counters[var] = 1  # Next version will be _1
 
+        # Generate new SSA name and track base mapping
         def new_name(var: str) -> str:
-            """Generate new SSA name and track base mapping"""
             version = counters[var]
             ssa_name = f"{var}_{version}"
             ssa_to_base[ssa_name] = var  # Track original base
@@ -356,24 +326,23 @@ class SSATransformer:
             stacks[var].append(ssa_name)
             return ssa_name
 
+        # Process a single block
         def process_block(bb: BasicBlock):
-            defined_vars = set()
+            defined_vars = dict()
 
-            # Process instructions
             for idx, (instr, _) in enumerate(bb.instrlist):
                 if isinstance(instr, PhiCommand):
-                    # Use entire variable name as base
                     ssa_name = instr.var
                     base_var = ssa_to_base.get(ssa_name, ssa_name)
                     new_var = new_name(base_var)
                     instr.var = new_var
-                    defined_vars.add(base_var)
+                    defined_vars[base_var] = defined_vars.get(base_var, 0)+1
                 elif isinstance(instr, AssignmentCommand):
                     original_var = ssa_to_base.get(instr.lvar.varname, instr.lvar.varname)
                     self._rename_in_expr(instr.rexpr, stacks)
                     new_var = new_name(original_var)
                     instr.lvar = Var(new_var)
-                    defined_vars.add(original_var)
+                    defined_vars[original_var] = defined_vars.get(original_var, 0) + 1
                 elif isinstance(instr, MoveCommand):
                     self._rename_in_expr(instr.expr, stacks)
                 elif isinstance(instr, GotoCommand):
@@ -402,23 +371,24 @@ class SSATransformer:
                 process_block(child)
 
             # Roll back stacks
-            for var in defined_vars:
-                if stacks[var]:
-                    stacks[var].pop()
+            for var in defined_vars.keys():
+                while(defined_vars[var]):
+                    if stacks[var]:
+                        stacks[var].pop()
+                    defined_vars[var]-=1
 
         # Start processing from entry block
         entry_node = next(n for n in self.cfg.nodes() if n.name == 'START')
         process_block(entry_node)
-        dumpCFG(self.cfg, "cfg_after_rename")
+        dumpCFG(self.cfg, "cfg2_old_after_rename")
         return self.cfg
 
 
-# ======================== Interface ========================
+# Interface to perform ssa transformation
 def build_ssa(ir, cfg: ChironCFG) -> ChironCFG:
-    """Top-level SSA transformation entry point"""
     transformer = SSATransformer(ir, cfg)
     transformer.insert_phi_functions()
     transformer.rename_variables()
     post_ssa_CFG = buildCFG(ir, "post_ssa_control_flow_graph")
-    dumpCFG(post_ssa_CFG, "cfg_new_post_ssa")
+    dumpCFG(post_ssa_CFG, "cfg3_new_post_ssa")
     return transformer.cfg
