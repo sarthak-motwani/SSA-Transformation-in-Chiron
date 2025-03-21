@@ -88,7 +88,7 @@ outputs.
 
 ```bash
 $ cd ChironCore
-$ ./chiron.py -r ./example/example6.tl -cfg_gen -cfg_dump --ir -ssa
+$ ./chiron.py -r ./testcases/1_straightline.tl -cfg_gen -cfg_dump --ir -ssa -outssa
 ```
 
 ### See help for other command line options
