@@ -235,7 +235,6 @@ class Var(Value):
         return self.varname
 
 
-# Add to ChironAST.py
 class PhiCommand(Instruction):
     def __init__(self, var: str, operands: list):
         """
