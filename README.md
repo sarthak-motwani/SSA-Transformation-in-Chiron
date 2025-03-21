@@ -60,13 +60,31 @@ $ java -cp ../extlib/antlr-4.7.2-complete.jar org.antlr.v4.Tool \
 
 The main directory for source files is `ChironCore`. We have examples of the turtle programs in `examples` folder.
 To pass parameters (input params) for running a turtle program, use the `-d` flag. Pass the parameters as a python dictionary. 
-To convert the IR to SSA form, use the `-ssa` flag. To compare IRs before and after SSA, first run the program without this flag and then re-run the program with this flag. The IR is printed in the terminal (using the `-ir` flag) and CFG after phi-function insertion can be seen in `cfg_after_phi_insertion.png` and after renaming can be seen in `cfg_after_rename.png`.
+To perform SSA transformation, use the `-ssa flag`. Also use the `--ir` flag to see the new IR
+printed in the terminal. Also, use the `-cfg_gen` and `-cfg_dump` flags to dump the CFG for the
+original IR.
+To perform out-of-SSA transformation (along and after SSA transformation), also pass the
+`-outssa` flag with the `-ssa` flag. The testcases are present in `testcases` folder within
+`ChironCore`. There are more examples in the `Examples` folder also.
 
-- Now, I have also modified the jump offsets in the linear IR, since they became incorrect after inserting  instructions in the linear IR. After modifying these offsets, I am making a new CFG from this IR which can be seen at `cfg_new_post_ssa.png`.
+### Testing SSA Transformation
 
-- So, While testing there are two things to test for now. One is that the SSA transformation is correct (this 
-can be checked by seeing whether phi-function insertion and renaming is happening correctly in `cfg_after_rename.png`). Also, to check that the jump offsets in the IR are correctly modified (can be done by checking that
-`cfg_after_rename.png` and `cfg_new_post_ssa.png` are identical).
+- The new IR will be printed on the terminal.
+- `control_flow_graph.png` shows the CFG before transformation.
+- `cfg2_old_after_rename.png` shows the CFG after SSA renaming (before IR
+updates).
+- `cfg3_new_post_ssa.png` shows the CFG rebuilt from the SSA-transformed IR.
+- Running with only `-ssa` may result in errors because the interpreter does not interpret
+phi-instructions.
+
+### Testing Out-of-SSA Tranformation
+- The new IR will be printed on the terminal.
+- `cfg4_old_out_of_ssa.png` shows the CFG after Out-of-SSA transformation (before
+IR updates).
+- `cfg5_new_out_of_ssa.png` shows the CFG rebuilt from the Out-of-SSA transformed
+IR.
+- Running the program with (SSA + Out-of-SSA) and without SSA transformations should produce identical
+outputs.
 
 ```bash
 $ cd ChironCore
