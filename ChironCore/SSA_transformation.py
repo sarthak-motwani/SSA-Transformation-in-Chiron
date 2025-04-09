@@ -391,4 +391,4 @@ def build_ssa(ir, cfg: ChironCFG) -> ChironCFG:
     transformer.rename_variables()
     post_ssa_CFG = buildCFG(ir, "post_ssa_control_flow_graph")
     dumpCFG(post_ssa_CFG, "cfg3_new_post_ssa")
-    return transformer.cfg
+    return post_ssa_CFG

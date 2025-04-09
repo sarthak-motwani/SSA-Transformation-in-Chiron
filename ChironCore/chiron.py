@@ -8,6 +8,7 @@ import abstractInterpretation as AI
 import dataFlowAnalysis as DFA
 import SSA_transformation as SSA
 import Out_of_ssa as OutSSA
+import SSCP as SSCP
 from sbfl import testsuiteGenerator
 
 sys.path.insert(0, "../Submission/")
@@ -151,6 +152,13 @@ if __name__ == "__main__":
         help="Run Out of SSA Transformation",
     )
 
+    cmdparser.add_argument(
+        "-sscp",
+        "--sparse_simple_const_prop",
+        action="store_true",
+        help="Perform SSCP optimization",
+    )
+
     # adding ends here
     cmdparser.add_argument(
         "-sbfl",
@@ -251,9 +259,17 @@ if __name__ == "__main__":
         cfg = cfgB.buildCFG(ir, "control_flow_graph")
         irHandler.setCFG(cfg)
         ssa_cfg = SSA.build_ssa(ir, cfg)
+        sscp_cfg = ssa_cfg
     
+        if args.sparse_simple_const_prop:
+            sscp_obj = SSCP.SSCP(ssa_cfg)
+            result_sscp = sscp_obj.get_results()
+            SSCP.optimize_ir(ssa_cfg, sscp_obj, ir, result_sscp)
+            sscp_cfg = cfgB.buildCFG(ir, "cfg_sscp")
+            cfgB.dumpCFG(sscp_cfg, "cfg6_new_sscp")
+            
         if args.out_of_ssa:
-            OutSSA.out_of_ssa(ir, cfg)
+            OutSSA.out_of_ssa(ir, sscp_cfg)
 
     #Adding ends
 
