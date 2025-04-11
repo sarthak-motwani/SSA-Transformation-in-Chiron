@@ -6,10 +6,13 @@ import sys
 from ChironAST.builder import astGenPass
 import abstractInterpretation as AI
 import dataFlowAnalysis as DFA
-import SSA_transformation as SSA
-import Out_of_ssa as OutSSA
-import SSCP as SSCP
+import ssa.SSA_transformation as SSA
+import ssa.Out_of_ssa as OutSSA
+import ssa.SSCP as SSCP
 from sbfl import testsuiteGenerator
+from ChironAST.ChironAST import (
+    Instruction, PhiCommand, AssignmentCommand, ConditionCommand, BoolExpr, BoolFalse, Var as VarExpr, Num
+)
 
 sys.path.insert(0, "../Submission/")
 sys.path.insert(0, "ChironAST/")
@@ -256,11 +259,23 @@ if __name__ == "__main__":
 
     #Added by Sarthak Motwani
     if args.ssa_transformation:
+        if args.params:
+            for var in args.params.keys():
+                rhs_val = Num(args.params[var])
+                if not var.startswith(':'):
+                    var = ':'+ var
+                # print(var, args.params[var])
+                lhs_var = VarExpr(var)
+                assignment = AssignmentCommand(lhs_var, rhs_val)
+                ir.insert(0, (assignment, 1))
+            args.params = {}
+
         cfg = cfgB.buildCFG(ir, "control_flow_graph")
         irHandler.setCFG(cfg)
         ssa_cfg = SSA.build_ssa(ir, cfg)
         sscp_cfg = ssa_cfg
-    
+        result_sscp = None
+        
         if args.sparse_simple_const_prop:
             sscp_obj = SSCP.SSCP(ssa_cfg)
             result_sscp = sscp_obj.get_results()
@@ -269,7 +284,7 @@ if __name__ == "__main__":
             cfgB.dumpCFG(sscp_cfg, "cfg6_new_sscp")
             
         if args.out_of_ssa:
-            OutSSA.out_of_ssa(ir, sscp_cfg)
+            OutSSA.out_of_ssa(ir, sscp_cfg, result_sscp)
 
     #Adding ends
 

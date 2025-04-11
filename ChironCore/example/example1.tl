@@ -1,7 +1,3 @@
-:x = 20
-:y = 30
-:z = 20
-:p = 40
 pendown
 repeat 3 [
 

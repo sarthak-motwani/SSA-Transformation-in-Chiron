@@ -1,7 +1,8 @@
  :x = 20
  :y = 10
  :a = 10
- forward :x
+ :b = 3
+ forward :x + :a
  if (:y > :x) [
   :x = 30
   :y = 0
@@ -10,5 +11,5 @@
   :x = 25
    right 50
  ]
- forward :x+:a
+ forward :x+:a+:b
  forward :y

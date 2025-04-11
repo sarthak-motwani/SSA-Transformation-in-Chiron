@@ -10,9 +10,11 @@ from ChironAST.ChironAST import (
     BinArithOp, BinCondOp, UnaryArithOp, NOT,
     Num, BoolTrue, BoolFalse
 )
-from irhandler import IRHandler
 from cfg.cfgBuilder import dumpCFG, buildCFG
 from cfg.ChironCFG import BasicBlock, ChironCFG
+from dominanceFrontiers import (compute_dominators, compute_dominator_tree, 
+                                compute_dominance_frontiers)
+from liveVariables import compute_live_vars
 import bisect
 
 # Function to recursively extract used variables in an expression
@@ -26,126 +28,6 @@ def get_used_vars(expr) -> Set[str]:
     elif isinstance(expr, (Num, BoolTrue, BoolFalse)):
         return set()
     return set()
-
-# Function to compute dominators set for every basic block
-def compute_dominators(cfg: ChironCFG) -> Dict[BasicBlock, Set[BasicBlock]]:
-    dominators = {}
-    entry = cfg.entry
-    all_nodes = set(cfg.nodes())
-    
-    # Initialize dominance sets
-    for node in cfg.nodes():
-        dominators[node] = all_nodes if node != entry else {entry}
-    
-    changed = True
-    while changed:
-        changed = False
-        for node in cfg.nodes():
-            if node == entry:
-                continue   
-            preds = list(cfg.predecessors(node))
-            if preds:
-                # Compute intersection of all predecessors' dominators
-                predecessor_doms = [dominators[p] for p in preds]
-                new_dom = set.intersection(*predecessor_doms)
-            else:
-                new_dom = set()
-
-            new_dom.add(node)  # Node always dominates itself
-            
-            if new_dom != dominators[node]:
-                dominators[node] = new_dom
-                changed = True
-                
-    return dominators
-
-# Function to computer dominator tree using the CFG and immediate dominator
-def compute_dominator_tree(dominators: Dict) -> Dict[BasicBlock, List[BasicBlock]]:
-    dom_tree = {n: [] for n in dominators}
-
-    for node in dominators:
-        candidates = dominators[node] - {node}
-        if not candidates:
-            continue
-
-        # Find the immediate dominator (IDOM)
-        idom = None
-        for candidate in candidates:
-            # Check if this candidate dominates all other candidates
-            if all(other in dominators[candidate] for other in candidates if other != candidate):
-                idom = candidate
-                break
-
-        # Fallback: pick the first candidate (shouldn't happen in valid CFGs)
-        if not idom and candidates:
-            idom = next(iter(candidates))
-
-        if idom:
-            dom_tree[idom].append(node)
-
-    return dom_tree
-
-
-# Function to compute dominance frontiers
-def compute_dominance_frontiers( cfg: ChironCFG, dominators: Dict[BasicBlock, Set[BasicBlock]]) -> Dict[BasicBlock, Set[BasicBlock]]:
-    
-    frontiers = {n: set() for n in cfg.nodes()}
-    dom_tree = compute_dominator_tree(dominators)
-
-    for node in cfg.nodes():
-        predecessors = list(cfg.predecessors(node))
-        if len(predecessors) >= 2:  # Merge point
-            for p in predecessors:
-                runner = p
-                idom = next((d for d, children in dom_tree.items() if node in children), None)
-                while runner != idom and runner is not None:
-                    frontiers[runner].add(node)
-                    runner = next((d for d, children in dom_tree.items() if runner in children), None) # Move to runner's immediate dominator
-    return frontiers
-
-# Live Variable Analysis
-def compute_live_vars(cfg: ChironCFG) -> Tuple[Dict, Dict, Dict, Dict]:
-    live_in = {bb: set() for bb in cfg.nodes()}
-    live_out = {bb: set() for bb in cfg.nodes()}
-    ue_var = {bb: set() for bb in cfg.nodes()}
-    var_kill = {bb: set() for bb in cfg.nodes()}
-
-    # Compute UEVar and VarKill
-    for bb in cfg.nodes():
-        for instr, _ in bb.instrlist:
-            used = set()
-            defined = set()
-
-            if isinstance(instr, AssignmentCommand):
-                defined.add(instr.lvar.varname)
-                used.update(get_used_vars(instr.rexpr))
-            elif isinstance(instr, MoveCommand):
-                used.update(get_used_vars(instr.expr))
-            elif isinstance(instr, GotoCommand):
-                used.update(get_used_vars(instr.xcor))
-                used.update(get_used_vars(instr.ycor))
-            elif isinstance(instr, ConditionCommand):
-                used.update(get_used_vars(instr.cond))
-
-            for var in used:
-                if var not in var_kill[bb]:
-                    ue_var[bb].add(var)
-            var_kill[bb].update(defined)
-
-    # Second pass: Iterate to fixed point
-    changed = True
-    while changed:
-        changed = False
-        for bb in cfg.nodes():
-            new_live_out = set().union(*(live_in[s] for s in cfg.successors(bb)))
-            new_live_in = ue_var[bb] | (new_live_out - var_kill[bb])
-            
-            if new_live_in != live_in[bb]:
-                live_in[bb] = new_live_in
-                live_out[bb] = new_live_out
-                changed = True
-
-    return ue_var, var_kill, live_in, live_out
 
 # Class for SSA Transformation
 class SSATransformer:
@@ -171,7 +53,6 @@ class SSATransformer:
             self.ir.insert(real_idx, (i_p[1], 1))
             real_ctr+=1
 
-    
     # Helper function to make instruction indices in IR and (old) CFG same 
     # (used in updating jump offsets in IR)
     def synchronize_cfg_ir(self, idx_phi):
@@ -250,16 +131,6 @@ class SSATransformer:
         dumpCFG(self.cfg, "cfg1_old_after_phi_insertion")
         return self.cfg
 
-    def print_ir_before_rename(self, title: str = ""):
-        print(f"\n========== {title} ==========")
-        for bb in self.cfg.nodes():
-            print(f"\n--- Block {bb.name} ---")
-            for instr, offset in bb.instrlist:
-                print(f"{instr} [Offset: {offset}]")
-
-    def print_dominator_tree(self):
-        for bb in self.cfg.nodes():
-            print(f"Dom_tree({bb.name}) = {[df_node.name for df_node in self.dom_tree[bb]]}")
 
     # Function to check if a basic block already has phi-function for a variable  
     def _has_phi_for_var(self, bb: BasicBlock, var: str) -> bool:
@@ -354,11 +225,8 @@ class SSATransformer:
             # Update phi operands in successors
             for succ in self.cfg.successors(bb):
                 preds = list(self.cfg.predecessors(succ))
-                try:
-                    pred_idx = preds.index(bb)
-                except ValueError:
-                    continue
-
+                pred_idx = preds.index(bb)
+                
                 for phi_instr, _ in succ.instrlist:
                     if isinstance(phi_instr, PhiCommand):
                         # Resolve base variable using SSA map
