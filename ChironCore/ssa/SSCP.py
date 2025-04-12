@@ -158,7 +158,7 @@ class SSCP:
                     if op == '+': val = a + b
                     elif op == '-': val = a - b
                     elif op == '*': val = a * b
-                    elif op == '/': val = a // b if b != 0 else LatticeValue.bottom()
+                    elif op == '/': val = a / b if b != 0 else LatticeValue.bottom()
                     else: return LatticeValue.bottom()
                     return LatticeValue.constant(val)
                 except:
