@@ -272,20 +272,12 @@ class SSCPOptimizer:
             self.ir[i] = (optimized_instr, offset)
 
 
-        # for bb in self.cfg.nodes():
-        #     new_instrlist = []
-        #     for instr, idx in bb.instrlist:
-        #         optimized_instr = self._optimize_instruction(instr)
-        #         if optimized_instr is not None:
-        #             new_instrlist.append((optimized_instr, idx))
-        #     bb.instrlist = new_instrlist
-
     def _optimize_instruction(self, instr):
         if isinstance(instr, AssignmentCommand):
             return self._optimize_assignment(instr)
         elif isinstance(instr, PhiCommand):
             return self._optimize_phi(instr)
-        elif isinstance(instr, (MoveCommand, ConditionCommand)):
+        elif isinstance(instr, (MoveCommand, ConditionCommand, GotoCommand)):
             return self._optimize_expr_instr(instr)
         return instr  # Other instructions remain unchanged
 
@@ -348,102 +340,6 @@ class SSCPOptimizer:
             new_expr = self._replace_vars_in_expr(expr.expr)
             return NOT(new_expr)
         return expr
-"""
-def _replace_vars_in_expr(self, expr):
-        # Step 1: Replace variables in the expression
-        replaced_expr = self._replace_vars_in_expr_helper(expr)
-        # Step 2: Evaluate the replaced expression if it is fully constant
-        evaluated_expr = self._evaluate_constant_expression(replaced_expr)
-        return evaluated_expr
-
-    def _replace_vars_in_expr_helper(self, expr):
-        ""Helper to replace variables without further evaluation.""
-        if isinstance(expr, Var):
-            const_val = self.constants.get(expr.varname, LatticeValue.bottom())
-            if const_val.is_constant():
-                return Num(const_val.constant)
-            else:
-                return expr
-        elif isinstance(expr, BinArithOp):
-            new_lexpr = self._replace_vars_in_expr_helper(expr.lexpr)
-            new_rexpr = self._replace_vars_in_expr_helper(expr.rexpr)
-            return BinArithOp(new_lexpr, new_rexpr, expr.symbol)
-        elif isinstance(expr, UnaryArithOp):
-            new_expr = self._replace_vars_in_expr_helper(expr.expr)
-            return UnaryArithOp(new_expr, expr.symbol)
-        elif isinstance(expr, BinCondOp):
-            new_lexpr = self._replace_vars_in_expr_helper(expr.lexpr)
-            new_rexpr = self._replace_vars_in_expr_helper(expr.rexpr)
-            return BinCondOp(new_lexpr, new_rexpr, expr.symbol)
-        elif isinstance(expr, NOT):
-            new_expr = self._replace_vars_in_expr_helper(expr.expr)
-            return NOT(new_expr)
-        else:
-            return expr  # Num, BoolTrue/False remain unchanged
-
-    def _evaluate_constant_expression(self, expr):
-        ""Evaluate an expression if all sub-expressions are constants.""
-        if isinstance(expr, Num) or isinstance(expr, (BoolTrue, BoolFalse)):
-            return expr
-        elif isinstance(expr, BinArithOp):
-            left = self._evaluate_constant_expression(expr.lexpr)
-            right = self._evaluate_constant_expression(expr.rexpr)
-            if isinstance(left, Num) and isinstance(right, Num):
-                try:
-                    op = expr.symbol
-                    a, b = left.val, right.val
-                    if op == '+': res = a + b
-                    elif op == '-': res = a - b
-                    elif op == '*': res = a * b
-                    elif op == '/': res = a // b if b != 0 else None
-                    else: return expr
-                    return Num(res) if res is not None else expr
-                except:
-                    return expr
-            else:
-                return expr
-        elif isinstance(expr, UnaryArithOp):
-            sub_expr = self._evaluate_constant_expression(expr.expr)
-            if isinstance(sub_expr, Num):
-                if expr.symbol == '-':
-                    return Num(-sub_expr.val)
-                else:
-                    return sub_expr
-            else:
-                return expr
-        elif isinstance(expr, BinCondOp):
-            left = self._evaluate_constant_expression(expr.lexpr)
-            right = self._evaluate_constant_expression(expr.rexpr)
-            if isinstance(left, (Num, BoolTrue, BoolFalse)) and isinstance(right, (Num, BoolTrue, BoolFalse)):
-                a = left.val if isinstance(left, Num) else (isinstance(left, BoolTrue))
-                b = right.val if isinstance(right, Num) else (isinstance(right, BoolTrue))
-                try:
-                    op = expr.symbol
-                    if op == '<': res = a < b
-                    elif op == '>': res = a > b
-                    elif op == '==': res = a == b
-                    elif op == '!=': res = a != b
-                    elif op == '<=': res = a <= b
-                    elif op == '>=': res = a >= b
-                    elif op == '&&': res = a and b
-                    elif op == '||': res = a or b
-                    else: return expr
-                    return BoolTrue() if res else BoolFalse()
-                except:
-                    return expr
-            else:
-                return expr
-        elif isinstance(expr, NOT):
-            sub_expr = self._evaluate_constant_expression(expr.expr)
-            if isinstance(sub_expr, BoolTrue):
-                return BoolFalse()
-            elif isinstance(sub_expr, BoolFalse):
-                return BoolTrue()
-            else:
-                return expr
-        else:
-            return expr
-"""
 
 # Interface
 def optimize_ir(cfg: ChironCFG, sscp: SSCP, ir, sscp_results:  Dict[str, LatticeValue]):

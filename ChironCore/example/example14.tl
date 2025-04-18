@@ -1,6 +1,7 @@
 :x = 10
 if(:x>3)[
-    forward 50
+    forward :x
+    :x  = 10
 ]
 else[
     backward 50

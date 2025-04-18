@@ -102,7 +102,7 @@ class OutOfSSATransformer:
                 for idx, pred in enumerate(predecessors):
                     operand = operands[idx]
                     if(operand.endswith("_0")):
-                        temp_assignment = AssignmentCommand(Var(var), Num(10))
+                        temp_assignment = AssignmentCommand(Var(var), Num(0))
                         if(isinstance(pred.instrlist[-1][0], ConditionCommand)):
                             pred.instrlist.insert(len(pred.instrlist) - 1, (temp_assignment, 0))
                         else:

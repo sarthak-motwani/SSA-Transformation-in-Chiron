@@ -254,13 +254,15 @@ if __name__ == "__main__":
         irHandler.setCFG(None)
 
     if args.dump_cfg:
-        cfgB.dumpCFG(cfg, "control_flow_graph")
+        cfgB.dumpCFG(cfg, "cfg0_simple")
         # set the cfg of the program.
 
     #Added by Sarthak Motwani
     if args.ssa_transformation:
         if args.params:
             for var in args.params.keys():
+                if not isinstance(args.params[var], (int, float)):
+                    raise ValueError(f"{args.params[var]} is not a number")
                 rhs_val = Num(args.params[var])
                 if not var.startswith(':'):
                     var = ':'+ var
