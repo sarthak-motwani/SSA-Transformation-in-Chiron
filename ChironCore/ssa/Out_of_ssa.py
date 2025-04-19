@@ -9,7 +9,7 @@ from ChironAST.ChironAST import (
 from irhandler import IRHandler
 from cfg.cfgBuilder import buildCFG, dumpCFG
 from cfg.ChironCFG import ChironCFG, BasicBlock
-from ssa.SSCP import LatticeValue, SSCP, SSCPOptimizer
+from ssa.latticeValue import LatticeValue
 
 # Class to handle all functions for Out of SSA Transformation
 class OutOfSSATransformer:
