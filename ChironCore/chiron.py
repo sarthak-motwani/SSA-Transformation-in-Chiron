@@ -6,8 +6,8 @@ import sys
 from ChironAST.builder import astGenPass
 import abstractInterpretation as AI
 import dataFlowAnalysis as DFA
-import ssa.SSA_transformation as SSA
-import ssa.Out_of_ssa as OutSSA
+import ssa.SSATransformation as SSA
+import ssa.outOfSSA as OutSSA
 import ssa.SSCP as SSCP
 from sbfl import testsuiteGenerator
 from ChironAST.ChironAST import (
@@ -257,8 +257,9 @@ if __name__ == "__main__":
         cfgB.dumpCFG(cfg, "cfg0_simple")
         # set the cfg of the program.
 
-    #Added by Sarthak Motwani
+    #Added by Sarthak Motwani for SSA Transformation + Out-of-SSA + SSCP
     if args.ssa_transformation:
+        # Handling parameters
         if args.params:
             for var in args.params.keys():
                 if not isinstance(args.params[var], (int, float)):

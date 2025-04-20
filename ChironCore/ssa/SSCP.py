@@ -9,8 +9,8 @@ from ChironAST.ChironAST import (
 from cfg.ChironCFG import ChironCFG, BasicBlock
 from ssa.latticeValue import LatticeValue
         
-#SSCP driver class
 class SSCP:
+    """Sparse Simple Constant Propagation driver class."""
     def __init__(self, cfg: ChironCFG):
         self.cfg = cfg
         self.lattice: Dict[str, LatticeValue] = {}
@@ -21,8 +21,8 @@ class SSCP:
         self._initialize_lattice()
         self.run()
 
-    # Function to Populate def-use chains by scanning all instructions.
     def _build_def_use_chains(self):
+        """Populate def-use chains by scanning all instructions."""
         for bb in self.cfg.nodes():
             for instr, _ in bb.instrlist:
                 if isinstance(instr, AssignmentCommand):
@@ -46,8 +46,8 @@ class SSCP:
                     for var in used_vars:
                         self.def_use[var].append(instr)
 
-    # Function to Extract variables from an expression
     def _get_used_vars(self, expr) -> Set[str]:
+        """Extract variables from an expression."""
         if isinstance(expr, Var):
             return {expr.varname}
         elif isinstance(expr, (BinArithOp, BinCondOp)):
@@ -59,8 +59,8 @@ class SSCP:
         else:
             return set()
 
-    # Function to Initialize lattice values and evaluate initial constants.
     def _initialize_lattice(self):
+        """Initialize lattice values and evaluate initial constants."""
         # Set all variables to TOP initially
         for var in self.lattice:
             self.lattice[var] = LatticeValue.top()
@@ -73,14 +73,14 @@ class SSCP:
                 elif isinstance(instr, PhiCommand):
                     self._evaluate_phi(instr)
 
-    # Function to evaluate AssignmentCommand and update lattice.
     def _evaluate_assignment(self, instr: AssignmentCommand):
+        """Evaluate AssignmentCommand and update lattice."""
         lhs_var = instr.lvar.varname
         rhs_val = self._evaluate_expr(instr.rexpr)
         self._update_lattice(lhs_var, rhs_val)
 
-    # Function to evaluate PhiCommand by meeting all operands.
     def _evaluate_phi(self, instr: PhiCommand):
+        """Evaluate PhiCommand by meeting all operands."""
         lhs_var = instr.var
         current = self.lattice[lhs_var]
         new_val = LatticeValue.top()
@@ -91,8 +91,8 @@ class SSCP:
             new_val = self._meet(new_val, operand_val)
         self._update_lattice(lhs_var, new_val)
 
-    # Function to Evaluate an expression to a lattice value.
     def _evaluate_expr(self, expr) -> LatticeValue:
+        """Evaluate an expression to a lattice value."""
         if isinstance(expr, Num):
             return LatticeValue.constant(expr.val)
         elif isinstance(expr, Var):
@@ -104,11 +104,16 @@ class SSCP:
                 try:
                     op = expr.symbol
                     a, b = left.constant, right.constant
-                    if op == '+': val = a + b
-                    elif op == '-': val = a - b
-                    elif op == '*': val = a * b
-                    elif op == '/': val = a / b if b != 0 else LatticeValue.bottom()
-                    else: return LatticeValue.bottom()
+                    if op == '+':
+                        val = a + b
+                    elif op == '-':
+                        val = a - b
+                    elif op == '*':
+                        val = a * b
+                    elif op == '/':
+                        val = a / b if b != 0 else LatticeValue.bottom()
+                    else:
+                        return LatticeValue.bottom()
                     return LatticeValue.constant(val)
                 except:
                     return LatticeValue.bottom()
@@ -125,7 +130,7 @@ class SSCP:
         elif isinstance(expr, BinCondOp):
             left = self._evaluate_expr(expr.lexpr)
             right = self._evaluate_expr(expr.rexpr)
-            # Apply special rules for && and ||
+            # Apply special meet rules for && and ||
             if expr.symbol == '&&':
                 if left.is_constant() and left.constant is False:
                     return LatticeValue.constant(False)
@@ -141,13 +146,20 @@ class SSCP:
                 op = expr.symbol
                 a, b = left.constant, right.constant
                 try:
-                    if op == '<': res = a < b
-                    elif op == '>': res = a > b
-                    elif op == '==': res = a == b
-                    elif op == '!=': res = a != b
-                    elif op == '<=': res = a <= b
-                    elif op == '>=': res = a >= b
-                    else: return LatticeValue.bottom()
+                    if op == '<':
+                        res = a < b
+                    elif op == '>':
+                        res = a > b
+                    elif op == '==':
+                        res = a == b
+                    elif op == '!=':
+                        res = a != b
+                    elif op == '<=':
+                        res = a <= b
+                    elif op == '>=':
+                        res = a >= b
+                    else:
+                        return LatticeValue.bottom()
                     return LatticeValue.constant(res)
                 except:
                     return LatticeValue.bottom()
@@ -164,8 +176,8 @@ class SSCP:
         else:
             return LatticeValue.top()
 
-    # Function to Compute the meet of two lattice values
     def _meet(self, a: LatticeValue, b: LatticeValue) -> LatticeValue:
+        """Compute the meet of two lattice values."""
         if a.is_top():
             return b
         elif b.is_top():
@@ -177,16 +189,16 @@ class SSCP:
         else:
             return LatticeValue.bottom()
 
-    # Function to "Update the lattice value and enqueue if changed.
     def _update_lattice(self, var: str, new_val: LatticeValue):
+        """Update the lattice value and enqueue if changed."""
         current = self.lattice.get(var, LatticeValue.top())
         if new_val != current:
             self.lattice[var] = new_val
             if var not in self.worklist:
                 self.worklist.append(var)
 
-    # Function to run the SSCP algorithm until worklist is empty.
     def run(self):
+        """Run the SSCP algorithm until worklist is empty."""
         while self.worklist:
             var = self.worklist.popleft()
             for instr in self.def_use.get(var, []):
@@ -195,34 +207,35 @@ class SSCP:
                 elif isinstance(instr, PhiCommand):
                     self._evaluate_phi(instr)
 
-    # Function to return the constant value if known, else None
-    def get_constant(self, var: str) -> int | None:
+    def get_constant(self, var: str):
+        """Return the constant value if known, else None."""
         val = self.lattice.get(var, LatticeValue.bottom())
         return val.constant if val.is_constant() else None
 
-    # Function to return the computed lattice values for all variables
     def get_results(self) -> Dict[str, LatticeValue]:
+        """Return the computed lattice values for all variables."""
         print("\nLattice Values of All variables")
         for var in self.lattice.keys():
             print(var, self.lattice[var])
         return self.lattice
     
-# This class is responsible for replacing constant variables with the corresponding constants in the IR.
 class SSCPOptimizer:
+    """Replaces constant variables with the corresponding constants in the IR."""
+
     def __init__(self, cfg: ChironCFG, sscp: SSCP, ir, sscp_results:  Dict[str, LatticeValue]):
         self.cfg = cfg
         self.sscp = sscp
         self.ir = ir
         self.constants: Dict[str, LatticeValue] = sscp_results
 
-    # function to replace variables with constants in the IR
     def optimize(self):
+        """Replace variables with constants in the IR."""
         for i, (instr, offset) in enumerate(self.ir):
             optimized_instr = self._optimize_instruction(instr)
             self.ir[i] = (optimized_instr, offset)
 
-    # function to replace constant variables by the corr. constant in a single instruction
     def _optimize_instruction(self, instr):
+        """Replace constant variables by the corresponding constant in a single instruction."""
         if isinstance(instr, AssignmentCommand):
             return self._optimize_assignment(instr)
         elif isinstance(instr, PhiCommand):
@@ -231,8 +244,8 @@ class SSCPOptimizer:
             return self._optimize_expr_instr(instr)
         return instr  # Other instructions remain unchanged
 
-    # function to replace variables in AssignmentCommand with constants
     def _optimize_assignment(self, instr: AssignmentCommand) -> AssignmentCommand:
+        """Replace variables in AssignmentCommand with constants. """
         lhs_var = instr.lvar.varname
         optimized_rexpr = self._replace_vars_in_expr(instr.rexpr)
 
@@ -243,8 +256,8 @@ class SSCPOptimizer:
         else:
             return AssignmentCommand(instr.lvar, optimized_rexpr)
 
-    # function to replace PhiCommand with AssignmentCommand if resolved to a constant.
     def _optimize_phi(self, instr: PhiCommand):
+        """Replace PhiCommand with AssignmentCommand if resolved to a constant."""
         lhs_var = instr.var
         if self.constants.get(lhs_var, LatticeValue.bottom()).is_constant():
             const_val = self.constants[lhs_var].constant
@@ -252,8 +265,8 @@ class SSCPOptimizer:
         else:
             return instr
 
-    # function to replace variables in expressions
     def _optimize_expr_instr(self, instr):
+        """Replace variables in expressions."""
         if isinstance(instr, MoveCommand):
             optimized_expr = self._replace_vars_in_expr(instr.expr)
             return MoveCommand(instr.direction, optimized_expr)
@@ -266,8 +279,8 @@ class SSCPOptimizer:
             return GotoCommand(optimized_xcor, optimized_ycor)
         return instr
 
-    # function to recursively replace variables in an expression with constants
     def _replace_vars_in_expr(self, expr):
+        """Recursively replace variables in an expression with constants."""
         if isinstance(expr, Var):
             const_val = self.constants.get(expr.varname, LatticeValue.bottom())
             if const_val.is_constant():
@@ -290,7 +303,7 @@ class SSCPOptimizer:
             return NOT(new_expr)
         return expr
 
-# Interface to run optimization after constant propagation.
 def optimize_ir(cfg: ChironCFG, sscp: SSCP, ir, sscp_results:  Dict[str, LatticeValue]):
+    """Interface to run optimization after sparse simple constant propagation."""
     optimizer = SSCPOptimizer(cfg, sscp, ir, sscp_results)
     optimizer.optimize()
