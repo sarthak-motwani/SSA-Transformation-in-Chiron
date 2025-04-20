@@ -38,57 +38,42 @@ If you want to cite this work, you may use this.
   keywords={Surveys;Computer languages;Program processors;Software algorithms;Software systems;Task analysis;Engines;program analysis verification and testing;programming languages;software engineering;graduate level course;education},
   doi={10.1109/ASE56229.2023.00101}}
 ```
-### Installing Dependencies
 
-```bash
-$ pip install antlr4-python3-runtime==4.7.2 networkx z3-solver numpy 
-$ sudo apt-get install python3-tk
-```
+### Running an example with SSA Transformation
+Note: Use the  `--ir ` flag to see the new IR printed in the terminal. Also, use the  `-cfg_gen`  and  `-cfg_dump` flags to dump the CFG for the original IR. 
 
-### Generating the ANTLR files.
+- To perform SSA transformation, use the  `-ssa ` flag. (Note: If you are using the  `-r ` flag (also runs the program), the program may throw an error
+ at a phi-instruction since it cannot be interpreted. So, you can run the program without  `-r ` flag).
 
-The `antlr` files need to be rebuilt if any changes are made to the `tlang.g4` file or when installing Chiron for the first time.
-We use a visitor pattern to generate the AST from parsing. 
+- To perform out-of-SSA transformation (after SSA transformation), use  `-outssa ` flag with the  `-ssa ` flag.
 
-```
-$ cd ChironCore/turtparse
-$ java -cp ../extlib/antlr-4.7.2-complete.jar org.antlr.v4.Tool \
-  -Dlanguage=Python3 -visitor -no-listener tlang.g4
-```
+-To perform SSCP optimization (after SSA transformation), use  `-ssa` `-sscp` and `-outssa` flags.
 
-### Running an example
-
-The main directory for source files is `ChironCore`. We have examples of the turtle programs in `examples` folder.
-To pass parameters (input params) for running a turtle program, use the `-d` flag. Pass the parameters as a python dictionary. 
-To perform SSA transformation, use the `-ssa flag`. Also use the `--ir` flag to see the new IR
-printed in the terminal. Also, use the `-cfg_gen` and `-cfg_dump` flags to dump the CFG for the
-original IR.
-To perform out-of-SSA transformation (along and after SSA transformation), also pass the
-`-outssa` flag with the `-ssa` flag. The testcases are present in `testcases` folder within
-`ChironCore`. There are more examples in the `Examples` folder also.
+The testcases are present in the testcases directory within ChironCore. More examples are present in the example directory.
 
 ### Testing SSA Transformation
-
 - The new IR will be printed on the terminal.
-- `control_flow_graph.png` shows the CFG before transformation.
-- `cfg2_old_after_rename.png` shows the CFG after SSA renaming (before IR
-updates).
+- `cfg0.png` shows the CFG before transformation.
+- `cfg2_old_after_rename.png` shows the CFG after SSA renaming (before IR updates).
 - `cfg3_new_post_ssa.png` shows the CFG rebuilt from the SSA-transformed IR.
-- Running with only `-ssa` may result in errors because the interpreter does not interpret
-phi-instructions.
 
 ### Testing Out-of-SSA Tranformation
-- The new IR will be printed on the terminal.
-- `cfg4_old_out_of_ssa.png` shows the CFG after Out-of-SSA transformation (before
-IR updates).
-- `cfg5_new_out_of_ssa.png` shows the CFG rebuilt from the Out-of-SSA transformed
-IR.
-- Running the program with (SSA + Out-of-SSA) and without SSA transformations should produce identical
-outputs.
+- The new IR will be printed on the terminal. 
+- `cfg4_old_out_of_ssa.png` shows the CFG after Out-of-SSA transformation (before IR updates).
+- `cfg5_new_out_of_ssa.png` shows the CFG rebuilt from the Out-of-SSA transformed IR.
+- All other CFGs have the same description as in SSA transformation
+
+### Testing SSCP Optimization
+- The new IR (with variables replaced by corresponding constants) is printed on the terminal.
+- Lattice Values of all variables are printed on the terminal
+- `cfg6_new_sscp.png` shows the CFG after SSCP optimization
+- All other CFGs have the same description as in SSA and out of SSA transformation
+
+Running the program with (SSA + out-of-SSA + with or without SSCP) and without any transformation should produce identical outputs.
 
 ```bash
 $ cd ChironCore
-$ ./chiron.py -r ./testcases/1_straightline.tl -cfg_gen -cfg_dump --ir -ssa -outssa
+$ ./chiron.py -r ./testcases/1_straightline.tl -cfg_gen -cfg_dump --ir -ssa -outssa -sscp
 ```
 
 ### See help for other command line options
