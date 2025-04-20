@@ -47,7 +47,7 @@ Note: Use the  `--ir ` flag to see the new IR printed in the terminal. Also, use
 
 - To perform out-of-SSA transformation (after SSA transformation), use  `-outssa ` flag with the  `-ssa ` flag.
 
--To perform SSCP optimization (after SSA transformation), use  `-ssa` `-sscp` and `-outssa` flags.
+- To perform SSCP optimization (after SSA transformation), use  `-ssa` `-sscp` and `-outssa` flags.
 
 The testcases are present in the testcases directory within ChironCore. More examples are present in the example directory.
 
