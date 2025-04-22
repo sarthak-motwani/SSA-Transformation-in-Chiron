@@ -61,16 +61,17 @@ class OutOfSSATransformer:
         # Redirect u -> v to u -> new_block -> v
         old_idx_u = self.preds_list[v].index(u)
 
-        new_label = self.cfg.get_edge_label(u, v)
+        old_label = self.cfg.get_edge_label(u, v)
         self.cfg.nxgraph.remove_edge(u, v)
-        self.cfg.add_edge(u, new_block, label=new_label)
+        self.cfg.add_edge(u, new_block, label=old_label)
         self.cfg.add_edge(new_block, v, label='Cond_False')
         self.preds_list[v][old_idx_u] = new_block
         self.split_blocks[(u, v)] = new_block
         
-        if new_label == 'Cond_True':
-            u_index = self.initial_node_order.index(u)
-            self.initial_node_order.insert(u_index, new_block)
+        # This case will never likely never be it. Still needs to be formally argued.
+        if old_label == 'Cond_True':
+            v_index = self.initial_node_order.index(v)
+            self.initial_node_order.insert(v_index, new_block)
 
     def split_all_critical_edges(self):
         """Split all critical edges in the CFG."""
